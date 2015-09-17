@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/mnt/sdb2/research/WebSearcher/init.properties</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/src/java/wt10g/WTDocument.java</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/src/java/indexer/TrecDocIndexer.java</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/src/java/servlets/HTMLViewer.java</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/src/java/searcher/WT10GRetriever.java</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/web/index.jsp</file>
+            <file>file:/mnt/sdb2/research/WebSearcher/src/java/servlets/SearchServlet.java</file>
+        </group>
+    </open-files>
+</project-private>
