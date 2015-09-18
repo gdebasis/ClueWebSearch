@@ -8,6 +8,7 @@ package searcher;
 import indexer.TrecDocIndexer;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
+import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.Query;
@@ -24,16 +25,13 @@ public class ClueWebRetriever extends WT10GRetriever {
     }
     
     @Override
-    JsonArray constructJSONForDoc(Query q, int docid) throws Exception {
+    JsonObjectBuilder constructJSONForDoc(Query q, int docid) throws Exception {
         Document doc = reader.document(docid);
-        
-        JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();
         objectBuilder.add("title", doc.get(WTDocument.WTDOC_FIELD_TITLE));
         objectBuilder.add("url", doc.get(WTDocument.WTDOC_FIELD_URL));
         objectBuilder.add("id", doc.get(TrecDocIndexer.FIELD_ID));
-        arrayBuilder.add(objectBuilder);
-        return arrayBuilder.build();
+        return objectBuilder;
     }
     
 }
