@@ -6,9 +6,6 @@
 package searcher;
 
 import indexer.TrecDocIndexer;
-import javax.json.JsonArray;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.Query;

@@ -8,10 +8,15 @@ package servlets;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
+import javax.json.JsonArray;
+import javax.json.JsonException;
+import javax.json.JsonNumber;
+import javax.json.JsonReader;
 import javax.json.JsonWriter;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -21,9 +26,10 @@ import javax.servlet.http.HttpServletResponse;
 import searcher.WT10GRetriever;
 import javax.servlet.http.HttpSession;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import searcher.ClueWebRetriever;
+import searcher.MockRetriever;
+import searcher.Retriever;
 
 /**
  *
@@ -32,7 +38,7 @@ import searcher.ClueWebRetriever;
 public class SearchServlet extends HttpServlet {
 
     String propFileName;
-    WT10GRetriever retriever;
+    Retriever retriever;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -44,6 +50,7 @@ public class SearchServlet extends HttpServlet {
             Properties prop = new Properties();
             prop.load(new FileReader(propFileName));
             String retrClassName = prop.getProperty("retriever.type");
+            
             if (retrClassName.equals("WT10G")) {
                 retriever = new WT10GRetriever(propFileName);
             } else {
@@ -51,6 +58,7 @@ public class SearchServlet extends HttpServlet {
             }
         } catch (Exception ex) {
             ex.printStackTrace();
+            //retriever = new MockRetriever();
         }
     }
 
@@ -80,23 +88,80 @@ public class SearchServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
 
         try (PrintWriter printWriter = response.getWriter();
-            JsonWriter jsonWriter = Json.createWriter(printWriter)) {
-            
+                JsonWriter jsonWriter = Json.createWriter(printWriter)) {
+
             String queryStr = request.getParameter("query");
             System.out.println("query = |" + queryStr + "|");
-            String pageNum = request.getParameter("page");
-           
-            JsonObject json;
             Query query = retriever.buildQuery(queryStr);
-            if (pageNum == null) { // no pagination workflow
-                TopDocs topDocs = retriever.retrieve(query);
-                json = retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs);
-            } else { // pagination workflow
-                int page = Integer.parseUnsignedInt(pageNum);
-                TopDocs topDocs = getCachedTopDocs(request, queryStr, query);
-                json = retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs, page);
+            System.out.println(request.getParameterMap());
+
+            /*
+            request: Websearch?query=<q:String>&start=<s:int>&howMany=<h:int>
+            response: {"totHits":<int>, "results":[<r_s:JsonObject>, ..., <r_(s+h):JsonObject>]} or {"error":<message:String>} 
+            */
+            String startPar = request.getParameter("start");
+            String howManyPar = request.getParameter("howMany");
+            if (startPar != null && howManyPar != null) {
+                try {
+                    int start = Integer.parseUnsignedInt(startPar);
+                    int howMany = Integer.parseUnsignedInt(howManyPar);
+                    TopDocs topDocs = getCachedTopDocs(request, queryStr, query);
+                    jsonWriter.write(retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs, start, howMany));
+                    return;
+                } catch (NumberFormatException e) {
+                    System.err.println("start/howMany: " + startPar + "/" + howManyPar);
+                    System.err.println(e);
+                }
             }
-            jsonWriter.write(json);
+
+            /*
+            request: Websearch?query=<q:String>&selection=[<i_1:int>, ..., <i_n:int>]
+            response: {"totHits":<int>, "results":[<r_(i_1):JsonObject>, ..., <r_(i_n):JsonObject>]} or {"error":<message:String>} 
+            */
+            String selectionPar = request.getParameter("selection");
+            if (selectionPar != null) {
+                try (JsonReader reader = Json.createReader(new StringReader(selectionPar))) {
+                    JsonArray array = reader.readArray(); //JsonParsingException? seems to throw JsonException
+                    List<Integer> selection = new ArrayList<>(array.size());
+                    for (JsonNumber number : array.getValuesAs(JsonNumber.class)) { //ClassCastException
+                        selection.add(number.intValueExact()); //ArithmeticException
+                    }
+                    TopDocs topDocs = getCachedTopDocs(request, queryStr, query);
+                    jsonWriter.write(retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs, selection));
+                    return;
+                } catch (JsonException | ClassCastException | ArithmeticException e) {
+                    System.err.println("selection: " + selectionPar);
+                    System.err.println(e);
+                }
+            }
+            
+            /*
+            request: Websearch?query=<q:String>&page=<p:int>
+            response: {"totHits":<int>, "results":[<r_p[0]:JsonObject>, ..., <r_(p[10]):JsonObject>]} or {"error":<message:String>} 
+            */
+            String pagePar = request.getParameter("page");
+            if (pagePar != null) {
+                try {
+                    int page = Integer.parseUnsignedInt(pagePar);
+                    TopDocs topDocs = getCachedTopDocs(request, queryStr, query);
+                    jsonWriter.write(retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs, page));
+                    return;
+                } catch (NumberFormatException e) {
+                    System.err.println("page: " + pagePar);
+                    System.err.println(e);
+                }
+            }
+            
+            /*
+            request: Websearch?query=<q:String>
+            response: {"totHits":<int>, "results":[<r_0:JsonObject>, ..., <r_(tot-1):JsonObject>} or {"error":<message:String>} 
+            */
+
+            { // default: all documents (without cache)
+                TopDocs topDocs = retriever.retrieve(query);
+                jsonWriter.write(retriever.constructJSONForRetrievedSet(query, topDocs.scoreDocs));
+            }
+
         } catch (Exception ex) {
             ex.printStackTrace();
         }

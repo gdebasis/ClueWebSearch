@@ -40,7 +40,7 @@ import org.apache.lucene.analysis.core.*;
  *
  * @author dganguly
  */
-public class WT10GRetriever {
+public class WT10GRetriever implements Retriever {
 
     File indexDir;
     Properties prop;
@@ -77,7 +77,7 @@ public class WT10GRetriever {
         factory = Json.createBuilderFactory(null);
     }
 
-    protected List<String> buildStopwordList(String stopwordFileName) {
+    private List<String> buildStopwordList(String stopwordFileName) {
         List<String> stopwords = new ArrayList<>();
         String stopFile = prop.getProperty(stopwordFileName);
         String line;
@@ -94,7 +94,7 @@ public class WT10GRetriever {
         return stopwords;
     }
 
-    protected final Analyzer constructAnalyzer() {
+    private Analyzer constructAnalyzer() {
         Analyzer eanalyzer = new EnglishAnalyzer(
                 Version.LUCENE_4_9,
                 StopFilter.makeStopSet(
@@ -102,7 +102,7 @@ public class WT10GRetriever {
         return eanalyzer;
     }
 
-    String analyze(String query) throws Exception {
+    private String analyze(String query) throws Exception {
         StringBuilder buff = new StringBuilder();
         try (TokenStream stream = analyzer.tokenStream("dummy", new StringReader(query))) {
             CharTermAttribute termAtt = stream.addAttribute(CharTermAttribute.class);
@@ -117,6 +117,7 @@ public class WT10GRetriever {
         return buff.toString();
     }
 
+    @Override
     public Query buildQuery(String queryStr) throws Exception {
         BooleanQuery q = new BooleanQuery();
         String[] queryWords = analyze(queryStr).split("\\s+");
@@ -139,6 +140,7 @@ public class WT10GRetriever {
         return q;
     }
 
+    @Override
     public TopDocs retrieve(Query query) throws Exception {
         TopScoreDocCollector collector = TopScoreDocCollector.create(numTopDocs, true);
         searcher.search(query, collector);
@@ -146,36 +148,41 @@ public class WT10GRetriever {
         return topDocs;
     }
 
+    @Override
     public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits) throws Exception {
-        return this.constructJSONForRetrievedSet(query, hits, null);
+        return constructJSONForRetrievedSet(query, hits, new IntRange(0, hits.length));
     }
-    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, Integer pageNum) throws Exception {
-        
+
+    @Override
+    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, int pageNum) throws Exception {
+        int start = (pageNum - 1) * pageSize;
+        int end = start + pageSize;
+        //int hasMore = end < hits.length ? 1 : 0;
+        //objectBuilder.add("hasmore", hasMore);
+        IntRange range = new IntRange(start, end).limit(0, hits.length);
+        return constructJSONForRetrievedSet(query, hits, range);
+    }
+
+    @Override
+    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, int start, int howMany) throws Exception {
+        IntRange range = new IntRange(start, start + howMany).limit(0, hits.length);
+        return constructJSONForRetrievedSet(query, hits, range);
+    }
+
+    @Override
+    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, Iterable<Integer> selection) throws Exception {
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();
         if (hits == null || hits.length == 0) {
-            return objectBuilder.add("error", "Nothing found!!").build();
+            return objectBuilder.add("error", "Nothing found").build();
         }
-
-        int start, end;
-        if (pageNum != null) {
-            start = (pageNum - 1) * pageSize;
-            end = start + pageSize;
-            end = Math.min(end, hits.length);
-            int hasMore = end < hits.length ? 1 : 0;
-            objectBuilder.add("hasmore", hasMore);
-            objectBuilder.add("numhits", hits.length);
-        } else {
-            start = 0;
-            end = hits.length;
-        }
-
+        objectBuilder.add("numHits", hits.length);
         JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
-        for (int i = start; i < end; i++) {
-            ScoreDoc hit = hits[i];
-            arrayBuilder.add(constructJSONForDoc(query, hit.doc));
+        for (int i : selection) {
+            try {
+                arrayBuilder.add(constructJSONForDoc(query, hits[i].doc));
+            } catch (IndexOutOfBoundsException e) {}
         }
         objectBuilder.add("results", arrayBuilder);
-
         return objectBuilder.build();
     }
 
@@ -217,6 +224,7 @@ public class WT10GRetriever {
 
     // Called when the webapp passes in the docid and is interested
     // to fetch the content
+    @Override
     public String getHTMLFromDocId(String docId) throws Exception {
 
         TopScoreDocCollector collector;
