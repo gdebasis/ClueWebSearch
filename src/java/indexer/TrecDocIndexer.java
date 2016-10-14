@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.StopFilter;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.Document;
@@ -43,7 +44,7 @@ public class TrecDocIndexer {
     static final public String FIELD_ID = "id";
     static final public String FIELD_ANALYZED_CONTENT = "words";  // Standard analyzer w/o stopwords.
 
-    List<String> buildStopwordList(String stopwordFileName) {
+    public List<String> buildStopwordList(String stopwordFileName) {
         List<String> stopwords = new ArrayList<>();
         String stopFile = prop.getProperty(stopwordFileName);        
         String line;
@@ -61,11 +62,11 @@ public class TrecDocIndexer {
         return stopwords;
     }
 
-    Analyzer constructAnalyzer() {
+    Analyzer constructAnalyzer() throws Exception {
         Analyzer eanalyzer = new EnglishAnalyzer(
             Version.LUCENE_4_9,
             StopFilter.makeStopSet(
-                Version.LUCENE_4_9, buildStopwordList("stopfile"))); // default analyzer
+                Version.LUCENE_4_9, buildStopwordList("stopfile"))); // default analyzer        
         return eanalyzer;        
     }
     
@@ -116,7 +117,7 @@ public class TrecDocIndexer {
                 indexDirectory(f);  // recurse
             }
             else
-                indexFile(f);
+                indexFile(f, dir);
         }
     }
     
@@ -132,7 +133,7 @@ public class TrecDocIndexer {
         return doc;
     }
 
-    void indexFile(File file) throws Exception {
+    void indexFile(File file, File dir) throws Exception {
         FileReader fr = new FileReader(file);
         BufferedReader br = new BufferedReader(fr);
         String line;

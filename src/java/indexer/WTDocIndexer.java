@@ -6,6 +6,7 @@
 package indexer;
 
 import java.io.File;
+import java.io.FileReader;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +15,7 @@ import org.apache.lucene.analysis.core.StopFilter;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.util.Version;
 import webdocs.WTDocument;
@@ -31,7 +33,12 @@ public class WTDocIndexer extends TrecDocIndexer {
     }
 
     @Override
-    Analyzer constructAnalyzer() {
+    Analyzer constructAnalyzer() throws Exception {
+        // In the flow, we already have applied analyzer (WebDocAnalyzer),
+        // for our web page specific analysis, e.g. remove numbers, URLs,
+        // prune terms based on cut-off freq etc.
+
+        /*
         Analyzer defaultAnalyzer = new WhitespaceAnalyzer(Version.LUCENE_4_9);
         Map<String, Analyzer> anmap = new HashMap<String, Analyzer>();
         Analyzer enAnalyzer = new EnglishAnalyzer(
@@ -44,15 +51,19 @@ public class WTDocIndexer extends TrecDocIndexer {
         
         PerFieldAnalyzerWrapper pfAnalyzer = new PerFieldAnalyzerWrapper(defaultAnalyzer, anmap);
         return pfAnalyzer;
+        */
+        
+        //return new StandardAnalyzer(Version.LUCENE_4_9, new FileReader(prop.getProperty("stopfile")));
+        return new WhitespaceAnalyzer(Version.LUCENE_4_9);
     }
     
-    public WTDocumentParser buildParser(File f) {
-        return new WTDocumentParser(f);
+    public WTDocumentParser buildParser(File f, File dir) {
+        return new WTDocumentParser(this, f);
     }
     
     @Override
-    void indexFile(File file) throws Exception {
-        WTDocumentParser parser = buildParser(file);
+    void indexFile(File file, File dir) throws Exception {
+        WTDocumentParser parser = buildParser(file, dir);
         System.out.println("Indexing file: " + file.getName());
         parser.parse();
         List<Document> docs = parser.getDocuments();

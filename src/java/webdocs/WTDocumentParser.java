@@ -5,11 +5,13 @@
  */
 package webdocs;
 
+import indexer.TrecDocIndexer;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import org.apache.lucene.document.Document;
 
 /**
@@ -17,16 +19,20 @@ import org.apache.lucene.document.Document;
  * @author Debasis
  */
 public class WTDocumentParser {
+    TrecDocIndexer indexer;
     File ifile;
     StringBuffer buff;  // Accumulation buffer for storing the current topic
     List<WTDocument> docs;
     WTDocument doc;
     static final int offset = 7; // length of "<DOCNO>"
 
-    public WTDocumentParser(File ifile) {
+    public WTDocumentParser(TrecDocIndexer indexer, File ifile) {
+        this.indexer = indexer;
         this.ifile = ifile;
         buff = new StringBuffer();
         docs = new ArrayList<WTDocument>();
+        
+        Properties prop = indexer.getProperties();
     }
 
     public void parse() throws Exception {
@@ -44,7 +50,7 @@ public class WTDocumentParser {
                 doc.docNo = line.substring(startpos + offset, endpos);                
             }
             else if (line.startsWith("<DOC>")) {
-                doc = new WTDocument();
+                doc = new WTDocument(indexer);
             }
             else if (line.startsWith("</DOC>")) {
                 doc.html = htmlBuff.toString();
@@ -82,7 +88,7 @@ public class WTDocumentParser {
     
     public static void main(String[] args) {
         try {
-            WTDocumentParser parser = new WTDocumentParser(new File("wt001"));
+            WTDocumentParser parser = new WTDocumentParser(new TrecDocIndexer("init.properties"), new File("wt001"));
             parser.parse();
             System.out.println(parser);
         }

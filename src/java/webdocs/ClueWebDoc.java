@@ -5,6 +5,7 @@
  */
 package webdocs;
 
+import indexer.TrecDocIndexer;
 import static indexer.TrecDocIndexer.FIELD_ANALYZED_CONTENT;
 import static indexer.TrecDocIndexer.FIELD_ID;
 import org.apache.lucene.document.Document;
@@ -20,46 +21,50 @@ import java.io.*;
  */
 public class ClueWebDoc extends WTDocument {
 
-	boolean isHeader(String line) {
-		if (line.trim().equals("WARC/1.0"))
-			return true;
+    public ClueWebDoc(TrecDocIndexer indexer) {
+        super(indexer);
+    }
 
-		String[] tokens = line.split("\\s+");
-		if (tokens.length < 2)
-			return false;
+    boolean isHeader(String line) {
+        if (line.trim().equals("WARC/1.0"))
+                return true;
 
-		if (tokens[0].startsWith("HTTP/") && tokens.length == 3)
-			return true; // HTTP header start
+        String[] tokens = line.split("\\s+");
+        if (tokens.length < 2)
+                return false;
 
-		if (tokens[0].equals("Date:") || tokens[0].equals("Server:") ||
-			tokens[0].equals("Link:") || tokens[0].equals("Content-Type:") )
-			return true;
+        if (tokens[0].startsWith("HTTP/") && tokens.length == 3)
+                return true; // HTTP header start
 
-		if (tokens.length != 2)
-			return false; // probably not a header
+        if (tokens[0].equals("Date:") || tokens[0].equals("Server:") ||
+                tokens[0].equals("Link:") || tokens[0].equals("Content-Type:") )
+                return true;
 
-		if (tokens[0].indexOf("WARC") >= 0)
-			return true; // warc name: vals
-		if (tokens[0].endsWith(":"))
-			return true; // http attrib name: vals
+        if (tokens.length != 2)
+                return false; // probably not a header
 
-		return false;
-	}
+        if (tokens[0].indexOf("WARC") >= 0)
+                return true; // warc name: vals
+        if (tokens[0].endsWith(":"))
+                return true; // http attrib name: vals
 
-	// Clueweb specific pre-processing of the HTML...
-	// Try to identify the WARC records and the HTTP headers and remove them...
-	String preProcessHTML(String html) throws Exception {
-		StringBuffer buff = new StringBuffer();
-		BufferedReader br = new BufferedReader(new StringReader(html));
-		String line;
+        return false;
+    }
 
-		while ((line = br.readLine()) != null) {
-			if (!isHeader(line))
-				buff.append(line).append("\n");
-		}
-		br.close();
-		return buff.toString();
-	}	
+    // Clueweb specific pre-processing of the HTML...
+    // Try to identify the WARC records and the HTTP headers and remove them...
+    String preProcessHTML(String html) throws Exception {
+        StringBuffer buff = new StringBuffer();
+        BufferedReader br = new BufferedReader(new StringReader(html));
+        String line;
+
+        while ((line = br.readLine()) != null) {
+            if (!isHeader(line))
+                buff.append(line).append("\n");
+        }
+        br.close();
+        return buff.toString();
+    }	
     
     @Override
     Document constructLuceneDoc() {
@@ -71,13 +76,13 @@ public class ClueWebDoc extends WTDocument {
         doc.add(new Field(WTDOC_FIELD_TITLE, this.title==null? "" : this.title,
                 Field.Store.YES, Field.Index.ANALYZED, Field.TermVector.NO));
 
-		String ppHTML = html;
-		try {
-			ppHTML = preProcessHTML(html);
-		}
-		catch (Exception ex) {
-			ex.printStackTrace();
-		}
+        String ppHTML = html;
+        try {
+                ppHTML = preProcessHTML(html);
+        }
+        catch (Exception ex) {
+                ex.printStackTrace();
+        }
         doc.add(new StoredField(WTDOC_FIELD_HTML, compress(ppHTML)));
 
         // the words only... no term vectors 

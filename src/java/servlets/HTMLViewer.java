@@ -6,14 +6,14 @@
 
 package servlets;
 
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
+import java.util.Properties;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import searcher.WT10GRetriever;
+import searcher.*;
 
 /**
  *
@@ -22,12 +22,28 @@ import searcher.WT10GRetriever;
 public class HTMLViewer extends HttpServlet {
 
     String propFileName;
+    WT10GRetriever retriever;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
-        propFileName= config.getInitParameter("configFile");
+        try {
+            propFileName= config.getInitParameter("configFile");
+            //retriever = new WT10GRetriever(propFileName);
+            
+            // Create an object for either WT10G or ClueWeb retriever
+            Properties prop = new Properties();
+            prop.load(new FileReader(propFileName));
+            String retrClassName = prop.getProperty("retriever.type");
+            if (retrClassName.equals("WT10G"))
+                retriever = new WT10GRetriever(propFileName);
+            else
+                retriever = new ClueWebRetriever(propFileName);
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();            
+        }
     }
-        
+
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
@@ -43,8 +59,11 @@ public class HTMLViewer extends HttpServlet {
         PrintWriter out = response.getWriter();
         try {
             String queryStr = request.getParameter("docid");
+            int indexNum = Integer.parseInt(request.getParameter("index"));
+
             WT10GRetriever retriever = new WT10GRetriever(propFileName);
-            String html = retriever.getHTMLFromDocId(queryStr);
+            String html = retriever.getHTMLFromDocId(indexNum, queryStr);
+
             out.println(html);
             out.close();
         }
