@@ -55,13 +55,20 @@ public class SearchServlet extends HttpServlet {
             String query, String indexNumStr, String pageNumberStr)
             throws Exception {
         
-        int indexNumber = Integer.parseInt(indexNumStr);
+        int indexNumber = -1;
+
+		if(indexNumStr != null)
+			indexNumber = Integer.parseInt(indexNumStr);
         int pageNumber = Integer.parseInt(pageNumberStr);
         HttpSession session = request.getSession();
         
         HashMap<Integer, Integer> hitOrder = retriever.chooseIndexHitOrder(session, query);        
-        String key = query + "." + indexNumStr;
-        TopDocs topDocs = (TopDocs)session.getAttribute(key);
+        String key = null;
+		if (indexNumStr != null)
+			key = query + "." + indexNumStr;
+        else
+			key = query;
+		TopDocs topDocs = (TopDocs)session.getAttribute(key);
         if (topDocs != null) {
             ScoreDoc[] scoreDocs = topDocs.scoreDocs;
             return retriever.constructJSONForRetrievedSet(hitOrder, query, scoreDocs, indexNumber, pageNumber);
@@ -92,7 +99,7 @@ public class SearchServlet extends HttpServlet {
             System.out.println("page = |" + pageNum + "|");
             String indexNum = request.getParameter("index");
             System.out.println("index = |" + indexNum + "|");
-            
+
             if (pageNum == null) { // no pagination workflow
                 html = retriever.retrieve(queryStr);
             }

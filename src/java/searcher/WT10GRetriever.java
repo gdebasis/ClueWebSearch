@@ -64,6 +64,7 @@ public class WT10GRetriever {
     File indexDir;
     Properties prop;
     IndexReader[] readers;
+	IndexReader multiReader;
     Analyzer analyzer;
     float titleWeight;   // bodyWeight is 1-titleWeight
     float bodyWeight;
@@ -89,19 +90,28 @@ public class WT10GRetriever {
         pageSize = Integer.parseInt(prop.getProperty("serp.pagesize", "10"));
         factory = Json.createBuilderFactory(null);
     }
-    
+   
     void initIndexes() throws Exception {
         int numIndexes = Integer.parseInt(prop.getProperty("retriever.numindexes", "1"));        
+        String indexType = prop.getProperty("index.type", "single");
+        
         readers = new IndexReader[numIndexes];
-	System.out.println("#readers = " + readers.length);
+		System.out.println("#readers = " + readers.length);
         
         if (numIndexes > 1) {
-            for (int i=0; i < numIndexes; i++) {
-                String indexDirPath = prop.getProperty("subindex." + i);
-		System.out.println("Initializing index " + i + " from " + indexDirPath);
-                indexDir = new File(indexDirPath);
-                readers[i] = DirectoryReader.open(FSDirectory.open(indexDir));                
-            }
+			for (int i=0; i < numIndexes; i++) {
+				String indexDirPath = prop.getProperty("subindex." + i);
+				System.out.println("Initializing index " + i + " from " + indexDirPath);
+				indexDir = new File(indexDirPath);
+				readers[i] = DirectoryReader.open(FSDirectory.open(indexDir));
+				System.out.println("#docs in index " + i + ": " + readers[i].numDocs()); 
+			}
+			if (!indexType.equals("single")) {
+				// baaler camilla
+				System.out.println("Initializing multi-reader");
+				multiReader = new MultiReader(readers, true);
+				System.out.println("#docs in index: " + multiReader.numDocs()); 
+			}
         }
         else {
             String indexDirPath = prop.getProperty("index");
@@ -188,8 +198,9 @@ public class WT10GRetriever {
     }
 
     public String retrieve(String queryStr) throws Exception {
-        return retrieve(readers[0], queryStr);
+			return retrieve(multiReader == null? readers[0] : multiReader, queryStr);
     }
+
     // To be called from a servlet... Return the results to the servlet...
     private String retrieve(IndexReader reader, String queryStr) throws Exception {
         ScoreDoc[] hits = null;
@@ -219,9 +230,13 @@ public class WT10GRetriever {
         Query query = buildQuery(queryStr);
         TopScoreDocCollector collector = TopScoreDocCollector.create(numTopDocs, true);
        
-	System.out.println("Hitmap: "); 
-	System.out.println(indexOrder);
-        IndexReader reader = getReaderInOrder(indexOrder, indexNum);
+		System.out.println("Hitmap: "); 
+		System.out.println(indexOrder);
+
+		System.out.println("Multireader: " + multiReader);
+
+        IndexReader reader = multiReader != null? multiReader : getReaderInOrder(indexOrder, indexNum);;
+
         IndexSearcher searcher = initSearcher(reader);
         searcher.search(query, collector);
         topDocs = collector.topDocs();
@@ -238,9 +253,12 @@ public class WT10GRetriever {
     }
     
     public String constructJSONForRetrievedSet(HashMap<Integer, Integer> indexOrder, String queryStr, ScoreDoc[] hits, int indexNum, int pageNum) throws Exception {
+
+		System.out.println("Num Retrieved = " + hits.length);
+
         Query query = buildQuery(queryStr);
         
-        IndexReader reader = getReaderInOrder(indexOrder, indexNum);
+        IndexReader reader = multiReader!=null? multiReader : getReaderInOrder(indexOrder, indexNum);
         JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();
         
@@ -273,7 +291,7 @@ public class WT10GRetriever {
         objectBuilder.add("title", doc.get(WTDocument.WTDOC_FIELD_TITLE));
         objectBuilder.add("snippet", getSnippet(q, doc, docid));
         objectBuilder.add("id", doc.get(TrecDocIndexer.FIELD_ID));
-        objectBuilder.add("html", getBase64EncodedHTML(doc));
+        //objectBuilder.add("html", getBase64EncodedHTML(doc));
         arrayBuilder.add(objectBuilder);
         return arrayBuilder.build();
     }
@@ -309,8 +327,9 @@ public class WT10GRetriever {
             }
         }
        	String snippet = buff.toString(); 
-		byte[] encodedBytes = Base64.encodeBase64(snippet.getBytes());
-		return new String(encodedBytes);
+		return snippet;
+		//byte[] encodedBytes = Base64.encodeBase64(snippet.getBytes());
+		//return new String(encodedBytes);
     }
         
     public HashMap<Integer, Integer> chooseIndexHitOrder(HttpSession session, String query) throws Exception {
@@ -344,13 +363,15 @@ public class WT10GRetriever {
 
     // Called when the webapp passes in the docid and is interested
     // to fetch the content
-    public String getHTMLFromDocId(int indexNum, String docId) throws Exception {
+    public String getHTMLFromDocId(String indexNumStr, String docId) throws Exception {
         
         TopScoreDocCollector collector;
         TopDocs topDocs;
+
+		int indexNum = indexNumStr==null? -1 : Integer.parseInt(indexNumStr);
         
 		System.out.println("Docid Query = |" + docId + "|");
-		IndexReader reader = readers[indexNum];
+		IndexReader reader = indexNum==-1? multiReader : readers[indexNum];
 
         Query query = new TermQuery(new Term(TrecDocIndexer.FIELD_ID, docId.trim()));
         collector = TopScoreDocCollector.create(1, true);

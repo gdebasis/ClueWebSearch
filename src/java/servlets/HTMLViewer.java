@@ -59,10 +59,9 @@ public class HTMLViewer extends HttpServlet {
         PrintWriter out = response.getWriter();
         try {
             String queryStr = request.getParameter("docid");
-            int indexNum = Integer.parseInt(request.getParameter("index"));
 
             WT10GRetriever retriever = new WT10GRetriever(propFileName);
-            String html = retriever.getHTMLFromDocId(indexNum, queryStr);
+            String html = retriever.getHTMLFromDocId(request.getParameter("index"), queryStr);
 
             out.println(html);
             out.close();
