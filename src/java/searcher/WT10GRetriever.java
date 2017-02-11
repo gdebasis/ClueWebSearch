@@ -27,7 +27,6 @@ import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.QueryScorer;
 import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
 import org.apache.lucene.search.highlight.TextFragment;
-import org.apache.lucene.search.highlight.TokenSources;
 import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
@@ -35,10 +34,8 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.html.HtmlParser;
 import org.apache.tika.sax.BodyContentHandler;
-import org.json.simple.JSONArray;
 import org.xml.sax.ContentHandler;
 import webdocs.WTDocument;
-import org.apache.lucene.analysis.core.*;
 import org.apache.commons.codec.binary.Base64;
 
 /**
@@ -252,9 +249,9 @@ public class WT10GRetriever {
         return arrayBuilder.build().toString();
     }
     
-    public String constructJSONForRetrievedSet(HashMap<Integer, Integer> indexOrder, String queryStr, ScoreDoc[] hits, int indexNum, int pageNum) throws Exception {
+    public String constructJSONForRetrievedSet(HashMap<Integer, Integer> indexOrder, String queryStr, ScoreDoc[] hits, int indexNum, int pageNum, int[] selection) throws Exception {
 
-		System.out.println("Num Retrieved = " + hits.length);
+	System.out.println("Num Retrieved = " + hits.length);
 
         Query query = buildQuery(queryStr);
         
@@ -262,21 +259,29 @@ public class WT10GRetriever {
         JsonArrayBuilder arrayBuilder = factory.createArrayBuilder();
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();
         
-        int start = (pageNum-1)*pageSize; 
-       	int end = start + pageSize;
+        if (selection != null) {
+            for (int i : selection) {
+                ScoreDoc hit = hits[i];
+                arrayBuilder.add(constructJSONForDoc(reader, query, hit.doc));
+            }
+        } else {
+            int start = (pageNum - 1) * pageSize;
+            int end = start + pageSize;
 
-        if (end >= hits.length)
+            if (end >= hits.length) {
                 end = hits.length;
+            }
 
-        int hasMore = end < hits.length? 1 : 0; 
+            int hasMore = end < hits.length ? 1 : 0;
+            for (int i = start; i < end; i++) {
+                ScoreDoc hit = hits[i];
+                arrayBuilder.add(constructJSONForDoc(reader, query, hit.doc));
+            }
+            // append the hasMore flag and the number of hits for this query...
+            objectBuilder.add("hasmore", hasMore); 
 
-        for (int i = start; i < end; i++) {
-            ScoreDoc hit = hits[i];
-            arrayBuilder.add(constructJSONForDoc(reader, query, hit.doc));
         }
         
-        // append the hasMore flag and the number of hits for this query...
-        objectBuilder.add("hasmore", hasMore); 
         objectBuilder.add("numhits", hits.length); 
         arrayBuilder.add(objectBuilder);
 

@@ -9,8 +9,14 @@ package servlets;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.util.HashMap;
 import java.util.Properties;
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonException;
+import javax.json.JsonNumber;
+import javax.json.JsonReader;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -52,31 +58,31 @@ public class SearchServlet extends HttpServlet {
     
     /* Return the snapshot of the current page */
     String getPageViewOfResultList(HttpServletRequest request,
-            String query, String indexNumStr, String pageNumberStr)
+            String query, String indexNumStr, String pageNumberStr, int[] selection)
             throws Exception {
-        
+
         int indexNumber = -1;
 
-		if(indexNumStr != null)
-			indexNumber = Integer.parseInt(indexNumStr);
+        if (indexNumStr != null) {
+            indexNumber = Integer.parseInt(indexNumStr);
+        }
         int pageNumber = Integer.parseInt(pageNumberStr);
         HttpSession session = request.getSession();
-        
-        HashMap<Integer, Integer> hitOrder = retriever.chooseIndexHitOrder(session, query);        
-        String key = null;
-		if (indexNumStr != null)
-			key = query + "." + indexNumStr;
-        else
-			key = query;
-		TopDocs topDocs = (TopDocs)session.getAttribute(key);
-        if (topDocs != null) {
-            ScoreDoc[] scoreDocs = topDocs.scoreDocs;
-            return retriever.constructJSONForRetrievedSet(hitOrder, query, scoreDocs, indexNumber, pageNumber);
-        }       
-        
-        topDocs = retriever.retrieve(hitOrder, query, indexNumber, pageNumber);
-        session.setAttribute(key, topDocs);
-        return retriever.constructJSONForRetrievedSet(hitOrder, query, topDocs.scoreDocs, indexNumber, pageNumber);
+
+        HashMap<Integer, Integer> hitOrder = retriever.chooseIndexHitOrder(session, query);
+        String key;
+        if (indexNumStr != null) {
+            key = query + "." + indexNumStr;
+        } else {
+            key = query;
+        }
+        TopDocs topDocs = (TopDocs) session.getAttribute(key);
+        if (topDocs == null) {
+            topDocs = retriever.retrieve(hitOrder, query, indexNumber, pageNumber);
+            session.setAttribute(key, topDocs);
+        }
+
+        return retriever.constructJSONForRetrievedSet(hitOrder, query, topDocs.scoreDocs, indexNumber, pageNumber, selection);
     }
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -99,14 +105,29 @@ public class SearchServlet extends HttpServlet {
             System.out.println("page = |" + pageNum + "|");
             String indexNum = request.getParameter("index");
             System.out.println("index = |" + indexNum + "|");
+            String selection = request.getParameter("selection");
+            System.out.println("selection = |" + selection + "|");
 
-            if (pageNum == null) { // no pagination workflow
+            if (pageNum == null && selection == null) { // no pagination workflow
                 html = retriever.retrieve(queryStr);
             }
             else { // pagination workflow
-                html = getPageViewOfResultList(request, queryStr, indexNum, pageNum);
-            }
-            
+                int[] selectionList = null;
+                if (selection != null) {
+                    try (JsonReader reader = Json.createReader(new StringReader(selection))) {
+                        JsonArray array = reader.readArray(); //JsonParsingException? seems to throw JsonException 
+                        selectionList = new int[array.size()];
+                        int i = 0;
+                        for (JsonNumber number : array.getValuesAs(JsonNumber.class)) { //ClassCastException
+                            selectionList[i++] = number.intValueExact(); //ArithmeticException
+                        }
+                    } 
+                    catch (JsonException | ClassCastException | ArithmeticException e) {    
+                        selectionList = null;
+                    }
+                }
+                html = getPageViewOfResultList(request, queryStr, indexNum, pageNum, selectionList);
+            }            
             out.println(html);                
             out.close();
         }
