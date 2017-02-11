@@ -24,7 +24,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import searcher.WT10GRetriever;
 import javax.servlet.http.HttpSession;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import searcher.ClueWebRetriever;
 /**
