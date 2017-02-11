@@ -1,20 +1,26 @@
-
 package searcher;
 
+import indexer.TrecDocIndexer;
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonBuilderFactory;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
+import webdocs.WTDocument;
 
 
 public class MockRetriever implements Retriever {
 
     @Override
     public Query buildQuery(String queryStr) throws Exception {
+        
         return null;
     }
     
@@ -28,7 +34,7 @@ public class MockRetriever implements Retriever {
 
     @Override
     public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits) throws Exception {
-        return constructJSONForRetrievedSet(query, hits, new IntRange(0, hits.length));
+        return constructJSONForRetrievedSet(hits, new IntRange(0, hits.length));
     }
 
     @Override
@@ -38,17 +44,17 @@ public class MockRetriever implements Retriever {
         //int hasMore = end < hits.length ? 1 : 0;
         //objectBuilder.add("hasmore", hasMore);
         IntRange range = new IntRange(start, end).limit(0, hits.length);
-        return constructJSONForRetrievedSet(query, hits, range);
+        return constructJSONForRetrievedSet(hits, range);
     }
 
     @Override
-    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, int start, int howMany) throws Exception {
+    public JsonObject constructJSONForRetrievedSet(Query query,ScoreDoc[] hits, int start, int howMany) throws Exception {
         IntRange range = new IntRange(start, start + howMany).limit(0, hits.length);
-        return constructJSONForRetrievedSet(query, hits, range);
+        return constructJSONForRetrievedSet( hits, range);
     }
 
     @Override
-    public JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, Iterable<Integer> selection) throws Exception {
+    public JsonObject constructJSONForRetrievedSet(ScoreDoc[] hits, Iterable<Integer> selection) throws Exception {
         JsonBuilderFactory factory = Json.createBuilderFactory(null);
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();
         if (hits == null || hits.length == 0) {
@@ -59,14 +65,14 @@ public class MockRetriever implements Retriever {
         for (Integer i : selection) {
             try {
                 ScoreDoc hit = hits[i];
-                arrayBuilder.add(constructJSONForDoc(query, i));
+                arrayBuilder.add(constructJSONForDoc(i));
             } catch (NullPointerException | IndexOutOfBoundsException e) {}
         }
         objectBuilder.add("results", arrayBuilder);
         return objectBuilder.build();
     }
     
-    JsonObjectBuilder constructJSONForDoc(Query q, int docid) throws Exception {
+    JsonObjectBuilder constructJSONForDoc(int docid) throws Exception {
         JsonBuilderFactory factory = Json.createBuilderFactory(null);
         
         JsonObjectBuilder objectBuilder = factory.createObjectBuilder();

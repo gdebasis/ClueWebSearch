@@ -107,46 +107,41 @@ public class SearchServlet extends HttpServlet {
             System.out.println("index = |" + indexNum + "|");
             
             String selection = request.getParameter("selection");
-            ArrayList<Integer> selectionArray = new ArrayList<>();
+             ArrayList<Integer> selectionArray = new ArrayList<>();
 
-	    if(selection != null)
+			if(selection != null)
             {
-		selection = selection.replace("[", "");
+				selection = selection.replace("[", "");
             	selection = selection.replace("]", "");
             	String[]selectionAr = selection.split(",");
 
-		for(int i = 0; i <  selectionAr.length;i++)
-                 	selectionArray.add(Integer.parseInt(selectionAr[i]));
+				for(int i = 0; i <  selectionAr.length;i++)
+                	selectionArray.add(Integer.parseInt(selectionAr[i]));
             }
-       	   if (pageNum == null && selection == null) { // no pagination workflow
-           {
+			if (pageNum == null && selection == null) { // no pagination workflow
                 html = retriever.retrieve(queryStr);
-		out.println(html);}
-           }
-           else { // pagination workflow
-                System.out.println("entered...........");
-		if(selection != null)
-		{
-             		TopDocs topDocs = (TopDocs)session.getAttribute(queryStr);
-             
-             		if(topDocs == null)
-             		{
-               			out.print("No query found");
-             		}		
-             		else
-             		{	    
-				System.out.println("session found...........");
-				MockRetriever ret = new MockRetriever();
-				out.print(ret.constructJSONForRetrievedSet(topDocs.scoreDocs, selectionArray));
-			}
-		}
-                else
-               {
-		 	html = getPageViewOfResultList(request, queryStr, indexNum, pageNum,session);
-			out.println(html);
-		}
             }
-            
+            else { // pagination workflow
+					if(selection != null)
+					{
+             				TopDocs topDocs = (TopDocs)session.getAttribute(queryStr);
+             
+             				if(topDocs == null)
+             				{
+                 				out.print("No query found");
+             				}		
+             				else{
+									MockRetriever ret = new MockRetriever();
+									out.print(ret.constructJSONForRetrievedSet(topDocs.scoreDocs, selectionArray));
+							}
+					}
+                	else
+                	{
+						html = getPageViewOfResultList(request, queryStr, indexNum, pageNum,session);
+						out.println(html);
+
+					}	
+            	}
             out.close();
         }
         catch (Exception ex) {

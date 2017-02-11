@@ -1,4 +1,3 @@
-
 package searcher;
 
 import java.util.Iterator;

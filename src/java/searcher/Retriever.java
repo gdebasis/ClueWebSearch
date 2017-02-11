@@ -1,4 +1,3 @@
-
 package searcher;
 
 import javax.json.JsonObject;
@@ -16,7 +15,7 @@ public interface Retriever {
 
     JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, int start, int howMany) throws Exception;
 
-    JsonObject constructJSONForRetrievedSet(Query query, ScoreDoc[] hits, Iterable<Integer> selection) throws Exception;
+    JsonObject constructJSONForRetrievedSet(ScoreDoc[] hits, Iterable<Integer> selection) throws Exception;
 
     // Called when the webapp passes in the docid and is interested
     // to fetch the content

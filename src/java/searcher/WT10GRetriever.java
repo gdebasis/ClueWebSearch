@@ -291,6 +291,7 @@ public class WT10GRetriever {
         objectBuilder.add("title", doc.get(WTDocument.WTDOC_FIELD_TITLE));
         objectBuilder.add("snippet", getSnippet(q, doc, docid));
         objectBuilder.add("id", doc.get(TrecDocIndexer.FIELD_ID));
+        objectBuilder.add("url", doc.get(WTDocument.WTDOC_FIELD_URL));
         //objectBuilder.add("html", getBase64EncodedHTML(doc));
         arrayBuilder.add(objectBuilder);
         return arrayBuilder.build();
