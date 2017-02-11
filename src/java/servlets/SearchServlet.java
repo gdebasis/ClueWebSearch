@@ -10,10 +10,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.*;
+import java.util.Properties;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import searcher.WT10GRetriever;
@@ -21,7 +21,6 @@ import javax.servlet.http.HttpSession;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import searcher.ClueWebRetriever;
-import searcher.MockRetriever;
 /**
  *
  * @author dganguly
@@ -53,7 +52,7 @@ public class SearchServlet extends HttpServlet {
     
     /* Return the snapshot of the current page */
     String getPageViewOfResultList(HttpServletRequest request,
-            String query, String indexNumStr, String pageNumberStr,HttpSession session)
+            String query, String indexNumStr, String pageNumberStr)
             throws Exception {
         
         int indexNumber = -1;
@@ -61,24 +60,21 @@ public class SearchServlet extends HttpServlet {
 		if(indexNumStr != null)
 			indexNumber = Integer.parseInt(indexNumStr);
         int pageNumber = Integer.parseInt(pageNumberStr);
+        HttpSession session = request.getSession();
         
         HashMap<Integer, Integer> hitOrder = retriever.chooseIndexHitOrder(session, query);        
         String key = null;
 		if (indexNumStr != null)
-        	key = query + "." + indexNumStr;
-		else
+			key = query + "." + indexNumStr;
+        else
 			key = query;
-        System.out.println("key : :: "+key);
 		TopDocs topDocs = (TopDocs)session.getAttribute(key);
         if (topDocs != null) {
             ScoreDoc[] scoreDocs = topDocs.scoreDocs;
-            System.out.println("Entered in session");
             return retriever.constructJSONForRetrievedSet(hitOrder, query, scoreDocs, indexNumber, pageNumber);
         }       
         
-			
         topDocs = retriever.retrieve(hitOrder, query, indexNumber, pageNumber);
-
         session.setAttribute(key, topDocs);
         return retriever.constructJSONForRetrievedSet(hitOrder, query, topDocs.scoreDocs, indexNumber, pageNumber);
     }
@@ -95,58 +91,23 @@ public class SearchServlet extends HttpServlet {
         throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
-		HttpSession session = request.getSession();
-        System.out.println((String)session.getId());
         String html = null;
         try {
             String queryStr = request.getParameter("query");
             System.out.println("query = |" + queryStr + "|");
-            String pageNum = request.getParameter("pageNum");
+            String pageNum = request.getParameter("page");
             System.out.println("page = |" + pageNum + "|");
             String indexNum = request.getParameter("index");
             System.out.println("index = |" + indexNum + "|");
-            
-            String selection = request.getParameter("selection");
-            ArrayList<Integer> selectionArray = new ArrayList<>();
 
-	    if(selection != null)
-            {
-		selection = selection.replace("[", "");
-            	selection = selection.replace("]", "");
-            	String[]selectionAr = selection.split(",");
-
-		for(int i = 0; i <  selectionAr.length;i++)
-                 	selectionArray.add(Integer.parseInt(selectionAr[i]));
-            }
-       	   if (pageNum == null && selection == null) { // no pagination workflow
-           {
+            if (pageNum == null) { // no pagination workflow
                 html = retriever.retrieve(queryStr);
-		out.println(html);}
-           }
-           else { // pagination workflow
-                System.out.println("entered...........");
-		if(selection != null)
-		{
-             		TopDocs topDocs = (TopDocs)session.getAttribute(queryStr);
-             
-             		if(topDocs == null)
-             		{
-               			out.print("No query found");
-             		}		
-             		else
-             		{	    
-				System.out.println("session found...........");
-				MockRetriever ret = new MockRetriever();
-				out.print(ret.constructJSONForRetrievedSet(topDocs.scoreDocs, selectionArray));
-			}
-		}
-                else
-               {
-		 	html = getPageViewOfResultList(request, queryStr, indexNum, pageNum,session);
-			out.println(html);
-		}
+            }
+            else { // pagination workflow
+                html = getPageViewOfResultList(request, queryStr, indexNum, pageNum);
             }
             
+            out.println(html);                
             out.close();
         }
         catch (Exception ex) {
@@ -194,4 +155,3 @@ public class SearchServlet extends HttpServlet {
     }// </editor-fold>
 
 }
-
