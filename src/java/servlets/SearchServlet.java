@@ -57,7 +57,7 @@ public class SearchServlet extends HttpServlet {
     
     /* Return the snapshot of the current page */
     String getPageViewOfResultList(HttpServletRequest request,
-            String query, String indexNumStr, String pageNumberStr, int[] selection)
+            String query, String indexNumStr, int pageNumber, int[] selection)
             throws Exception {
 
         int indexNumber = -1;
@@ -65,7 +65,6 @@ public class SearchServlet extends HttpServlet {
         if (indexNumStr != null) {
             indexNumber = Integer.parseInt(indexNumStr);
         }
-        int pageNumber = Integer.parseInt(pageNumberStr);
         HttpSession session = request.getSession();
 
         HashMap<Integer, Integer> hitOrder = retriever.chooseIndexHitOrder(session, query);
@@ -77,7 +76,7 @@ public class SearchServlet extends HttpServlet {
         }
         TopDocs topDocs = (TopDocs) session.getAttribute(key);
         if (topDocs == null) {
-            topDocs = retriever.retrieve(hitOrder, query, indexNumber, pageNumber);
+            topDocs = retriever.retrieve(hitOrder, query, indexNumber);
             session.setAttribute(key, topDocs);
         }
 
@@ -95,46 +94,63 @@ public class SearchServlet extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
-        PrintWriter out = response.getWriter();
-        String html = null;
-        try {
+        try (PrintWriter out = response.getWriter()) {
             String queryStr = request.getParameter("query");
             System.out.println("query = |" + queryStr + "|");
-            String pageNum = request.getParameter("page");
-            System.out.println("page = |" + pageNum + "|");
+            String pageNumStr = request.getParameter("page");
+            System.out.println("page = |" + pageNumStr + "|");
             String indexNum = request.getParameter("index");
             System.out.println("index = |" + indexNum + "|");
             String selection = request.getParameter("selection");
             System.out.println("selection = |" + selection + "|");
-
-            if (pageNum == null && selection == null) { // no pagination workflow
+            
+            String html;
+            if (pageNumStr == null && selection == null) { // no pagination workflow
                 html = retriever.retrieve(queryStr);
             }
             else { // pagination workflow
-                int[] selectionList = null;
-                if (selection != null) {
-                    try (JsonReader reader = Json.createReader(new StringReader(selection))) {
-                        JsonArray array = reader.readArray(); //JsonParsingException? seems to throw JsonException 
-                        selectionList = new int[array.size()];
-                        int i = 0;
-                        for (JsonNumber number : array.getValuesAs(JsonNumber.class)) { //ClassCastException
-                            selectionList[i++] = number.intValueExact(); //ArithmeticException
-                        }
-                    } 
-                    catch (JsonException | ClassCastException | ArithmeticException e) {    
-                        selectionList = null;
-                    }
-                }
+                int[] selectionList = getSelection(selection);
+                int pageNum =  getPage(pageNumStr);
                 html = getPageViewOfResultList(request, queryStr, indexNum, pageNum, selectionList);
             }            
-            out.println(html);                
-            out.close();
+            out.println(html);
         }
         catch (Exception ex) {
             ex.printStackTrace();
         }        
     }
 
+    private int[] getSelection(String selection) {
+        int[] selectionList = null;
+        if (selection != null) {
+            try (JsonReader reader = Json.createReader(new StringReader(selection))) {
+                JsonArray array = reader.readArray(); //JsonParsingException? seems to throw JsonException
+                selectionList = new int[array.size()];
+                int i = 0;
+                for (JsonNumber number : array.getValuesAs(JsonNumber.class)) { //ClassCastException
+                    selectionList[i++] = number.intValueExact(); //ArithmeticException
+                }
+            }
+            catch (JsonException | ClassCastException | ArithmeticException e) {
+                selectionList = null;
+            }
+        }
+        return selectionList;
+    }
+    
+    private int getPage(String pageNumStr) {
+        int pageNum = 1;
+        if (pageNumStr != null) {
+            try {
+                pageNum = Integer.parseInt(pageNumStr);
+            }
+            catch (NumberFormatException e) {
+                pageNum = 1;
+            }
+        }
+        return pageNum;
+    }
+    
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**
      * Handles the HTTP <code>GET</code> method.

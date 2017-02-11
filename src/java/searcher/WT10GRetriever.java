@@ -221,7 +221,7 @@ public class WT10GRetriever {
         return readers[indexOrder.get(indexNum)];
     }
     
-    public TopDocs retrieve(HashMap<Integer, Integer> indexOrder, String queryStr, int indexNum, int pageNum) throws Exception {
+    public TopDocs retrieve(HashMap<Integer, Integer> indexOrder, String queryStr, int indexNum) throws Exception {
         TopDocs topDocs = null;
 
         Query query = buildQuery(queryStr);
@@ -232,7 +232,7 @@ public class WT10GRetriever {
 
 		System.out.println("Multireader: " + multiReader);
 
-        IndexReader reader = multiReader != null? multiReader : getReaderInOrder(indexOrder, indexNum);;
+        IndexReader reader = multiReader != null? multiReader : getReaderInOrder(indexOrder, indexNum);
 
         IndexSearcher searcher = initSearcher(reader);
         searcher.search(query, collector);
@@ -261,13 +261,18 @@ public class WT10GRetriever {
         
         if (selection != null) {
             for (int i : selection) {
-                ScoreDoc hit = hits[i];
-                arrayBuilder.add(constructJSONForDoc(reader, query, hit.doc));
+                if (0 <= i && i < hits.length) {
+                    ScoreDoc hit = hits[i];
+                    arrayBuilder.add(constructJSONForDoc(reader, query, hit.doc));
+                }
             }
         } else {
+            
             int start = (pageNum - 1) * pageSize;
             int end = start + pageSize;
-
+            if (start < 0) {
+                start = 0;
+            }    
             if (end >= hits.length) {
                 end = hits.length;
             }
