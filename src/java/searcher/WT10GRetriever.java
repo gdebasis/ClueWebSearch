@@ -10,6 +10,8 @@ import indexer.IndexHtmlToText;
 import indexer.TrecDocIndexer;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.*;
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -318,7 +320,7 @@ public class WT10GRetriever {
         StringBuffer buff = new StringBuffer();
         SimpleHTMLFormatter htmlFormatter = new SimpleHTMLFormatter();
         Highlighter highlighter = new Highlighter(htmlFormatter, new QueryScorer(q));
-        
+        System.out.println("enterEd"); 
         // Get the decompressed html
         String html = IndexHtmlToText.decompress(
             doc.getBinaryValue(WTDocument.WTDOC_FIELD_HTML).bytes);
@@ -329,15 +331,24 @@ public class WT10GRetriever {
         Metadata metadata = new Metadata();
         new HtmlParser().parse(input, handler, metadata, new ParseContext());
         String text = handler.toString();
-                
-        TokenStream tokenStream = analyzer.tokenStream("dummy", new StringReader(text));
-        TextFragment[] frag = highlighter.getBestTextFragments(tokenStream, text, false, 5);
+	
+	TokenStream tokenStream = analyzer.tokenStream("dummy", new StringReader(text));
+        TextFragment[] frag = highlighter.getBestTextFragments(tokenStream, text, false,5);
         for (int j = 0; j < frag.length; j++) {
             if ((frag[j] != null) && (frag[j].getScore() > 0)) {
                 buff.append((frag[j].toString()));
             }
         }
-       	String snippet = buff.toString(); 
+       	String snippet = buff.toString();
+        String modifiedText = snippet;
+
+        String pattern = "<(\\s*)[a-zA-Z0-9]+[^>]+$";
+        Pattern r = Pattern.compile(pattern);
+        Matcher m = r.matcher(snippet);
+        if (m.find()) {
+            modifiedText = m.replaceAll("");
+        }
+        snippet = modifiedText; 
 		return snippet;
 		//byte[] encodedBytes = Base64.encodeBase64(snippet.getBytes());
 		//return new String(encodedBytes);
